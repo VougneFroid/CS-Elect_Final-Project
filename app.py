@@ -2,8 +2,8 @@ import json
 from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from utils.formatters import format_response, row_to_dict, rows_to_dict_list
-from utils.validators import validate_pilot_data, validate_ship_data, validate_ship_class_data
-from models import pilot, ship, ship_class
+from utils.validators import validate_pilot_data, validate_ship_data, validate_ship_class_data, validate_weapon_class_data
+from models import pilot, ship, ship_class, weapon_class
 
 app = Flask(__name__)
 
@@ -24,6 +24,7 @@ def close_db(error):
 PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']
 SHIP_COLUMNS = ['id', 'name', 'capacity', 'speed', 'shield', 'ship_class_id', 'ship_class_name', 'pilot_id', 'pilot_name']
 SHIP_CLASS_COLUMNS = ['id', 'name', 'description']
+WEAPON_CLASS_COLUMNS = ['id', 'class', 'damage', 'reload_speed', 'spread', 'range']
 
 @app.route('/')
 def home():
@@ -479,6 +480,148 @@ def delete_ship_class(class_id):
         return format_response({
             'status': 'error',
             'message': f'Failed to delete ship class: {str(e)}'
+        }, 500)
+
+# WeaponClass Endpoints
+@app.route('/api/weapon-classes', methods=['GET'])
+def get_weapon_classes():
+    # Get all weapon classes
+    try:
+        weapon_classes_data = weapon_class.get_all(mysql)
+        weapon_classes_list = rows_to_dict_list(weapon_classes_data, WEAPON_CLASS_COLUMNS)
+        return format_response({'weapon_classes': weapon_classes_list}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve weapon classes: {str(e)}'
+        }, 500)
+
+@app.route('/api/weapon-classes/<int:weapon_id>', methods=['GET'])
+def get_weapon_class(weapon_id):
+    # Get a single weapon class by ID
+    try:
+        weapon_class_data = weapon_class.get_by_id(mysql, weapon_id)
+        if weapon_class_data is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Weapon class with ID {weapon_id} not found'
+            }, 404)
+        
+        weapon_class_dict = row_to_dict(weapon_class_data, WEAPON_CLASS_COLUMNS)
+        return format_response({'weapon_class': weapon_class_dict}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve weapon class: {str(e)}'
+        }, 500)
+
+@app.route('/api/weapon-classes', methods=['POST'])
+def create_weapon_class():
+    # Create a new weapon class
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_weapon_class_data(data, is_update=False)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Create weapon class
+        weapon_id = weapon_class.create(mysql, data)
+        
+        # Retrieve and return the created weapon class
+        created_weapon_class = weapon_class.get_by_id(mysql, weapon_id)
+        weapon_class_dict = row_to_dict(created_weapon_class, WEAPON_CLASS_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Weapon class created successfully',
+            'weapon_class': weapon_class_dict
+        }, 201)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to create weapon class: {str(e)}'
+        }, 500)
+
+@app.route('/api/weapon-classes/<int:weapon_id>', methods=['PUT'])
+def update_weapon_class(weapon_id):
+    # Update an existing weapon class
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_weapon_class_data(data, is_update=True)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Check if weapon class exists
+        existing_weapon_class = weapon_class.get_by_id(mysql, weapon_id)
+        if existing_weapon_class is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Weapon class with ID {weapon_id} not found'
+            }, 404)
+        
+        # Update weapon class
+        weapon_class.update(mysql, weapon_id, data)
+        
+        # Retrieve and return updated weapon class
+        updated_weapon_class = weapon_class.get_by_id(mysql, weapon_id)
+        weapon_class_dict = row_to_dict(updated_weapon_class, WEAPON_CLASS_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Weapon class updated successfully',
+            'weapon_class': weapon_class_dict
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to update weapon class: {str(e)}'
+        }, 500)
+
+@app.route('/api/weapon-classes/<int:weapon_id>', methods=['DELETE'])
+def delete_weapon_class(weapon_id):
+    # Delete a weapon class
+    try:
+        # Check if weapon class exists
+        existing_weapon_class = weapon_class.get_by_id(mysql, weapon_id)
+        if existing_weapon_class is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Weapon class with ID {weapon_id} not found'
+            }, 404)
+        
+        # Delete weapon class
+        weapon_class.delete(mysql, weapon_id)
+        
+        return format_response({
+            'status': 'success',
+            'message': f'Weapon class with ID {weapon_id} deleted successfully'
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to delete weapon class: {str(e)}'
         }, 500)
 
 # Error Handlers

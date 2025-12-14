@@ -3,7 +3,7 @@ from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from utils.formatters import format_response, row_to_dict, rows_to_dict_list
 from utils.validators import validate_pilot_data, validate_ship_data, validate_ship_class_data, validate_weapon_class_data
-from models import pilot, ship, ship_class, weapon_class
+from models import pilot, ship, ship_class, weapon_class, ship_weapons
 
 app = Flask(__name__)
 
@@ -25,6 +25,7 @@ PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']
 SHIP_COLUMNS = ['id', 'name', 'capacity', 'speed', 'shield', 'ship_class_id', 'ship_class_name', 'pilot_id', 'pilot_name']
 SHIP_CLASS_COLUMNS = ['id', 'name', 'description']
 WEAPON_CLASS_COLUMNS = ['id', 'class', 'damage', 'reload_speed', 'spread', 'range']
+SHIP_WEAPONS_COLUMNS = ['ship_id', 'ship_name', 'ship_class_id', 'ship_class_name', 'weapon_class_id', 'weapon_class_name', 'name']
 
 @app.route('/')
 def home():
@@ -622,6 +623,143 @@ def delete_weapon_class(weapon_id):
         return format_response({
             'status': 'error',
             'message': f'Failed to delete weapon class: {str(e)}'
+        }, 500)
+
+# ShipWeapons Endpoints
+@app.route('/api/ship-weapons', methods=['GET'])
+def get_ship_weapons():
+    # Get all ship weapon assignments
+    try:
+        ship_weapons_data = ship_weapons.get_all(mysql)
+        ship_weapons_list = rows_to_dict_list(ship_weapons_data, SHIP_WEAPONS_COLUMNS)
+        return format_response({'ship_weapons': ship_weapons_list}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve ship weapons: {str(e)}'
+        }, 500)
+
+@app.route('/api/ship-weapons/ship/<int:ship_id>', methods=['GET'])
+def get_ship_weapons_by_ship(ship_id):
+    # Get all weapons for a specific ship
+    try:
+        ship_weapons_data = ship_weapons.get_by_ship_id(mysql, ship_id)
+        ship_weapons_list = rows_to_dict_list(ship_weapons_data, SHIP_WEAPONS_COLUMNS)
+        return format_response({'ship_weapons': ship_weapons_list}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve ship weapons: {str(e)}'
+        }, 500)
+
+@app.route('/api/ship-weapons/<int:ship_id>/<int:ship_class_id>/<int:weapon_class_id>', methods=['GET'])
+def get_ship_weapon(ship_id, ship_class_id, weapon_class_id):
+    # Get a specific ship weapon assignment
+    try:
+        ship_weapon_data = ship_weapons.get_by_id(mysql, ship_id, ship_class_id, weapon_class_id)
+        if ship_weapon_data is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Ship weapon assignment not found'
+            }, 404)
+        
+        ship_weapon_dict = row_to_dict(ship_weapon_data, SHIP_WEAPONS_COLUMNS)
+        return format_response({'ship_weapon': ship_weapon_dict}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve ship weapon: {str(e)}'
+        }, 500)
+
+@app.route('/api/ship-weapons', methods=['POST'])
+def create_ship_weapon():
+    # Create a new ship weapon assignment
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate required fields
+        required_fields = ['ship_id', 'ship_class_id', 'weapon_class_id', 'name']
+        for field in required_fields:
+            if field not in data:
+                return format_response({
+                    'status': 'error',
+                    'message': f'Missing required field: {field}'
+                }, 400)
+        
+        # Validate data types
+        if not isinstance(data['ship_id'], int) or data['ship_id'] < 1:
+            return format_response({
+                'status': 'error',
+                'message': 'Field ship_id must be a positive integer'
+            }, 400)
+        
+        if not isinstance(data['ship_class_id'], int) or data['ship_class_id'] < 1:
+            return format_response({
+                'status': 'error',
+                'message': 'Field ship_class_id must be a positive integer'
+            }, 400)
+        
+        if not isinstance(data['weapon_class_id'], int) or data['weapon_class_id'] < 1:
+            return format_response({
+                'status': 'error',
+                'message': 'Field weapon_class_id must be a positive integer'
+            }, 400)
+        
+        if not isinstance(data['name'], str) or len(data['name'].strip()) == 0:
+            return format_response({
+                'status': 'error',
+                'message': 'Field name must be a non-empty string'
+            }, 400)
+        
+        # Create ship weapon assignment
+        ship_weapons.create(mysql, data)
+        
+        # Retrieve and return the created assignment
+        created_ship_weapon = ship_weapons.get_by_id(mysql, data['ship_id'], 
+                                                     data['ship_class_id'], 
+                                                     data['weapon_class_id'])
+        ship_weapon_dict = row_to_dict(created_ship_weapon, SHIP_WEAPONS_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Ship weapon assignment created successfully',
+            'ship_weapon': ship_weapon_dict
+        }, 201)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to create ship weapon assignment: {str(e)}'
+        }, 500)
+
+@app.route('/api/ship-weapons/<int:ship_id>/<int:ship_class_id>/<int:weapon_class_id>', methods=['DELETE'])
+def delete_ship_weapon(ship_id, ship_class_id, weapon_class_id):
+    # Delete a ship weapon assignment
+    try:
+        # Check if assignment exists
+        existing_ship_weapon = ship_weapons.get_by_id(mysql, ship_id, ship_class_id, weapon_class_id)
+        if existing_ship_weapon is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Ship weapon assignment not found'
+            }, 404)
+        
+        # Delete ship weapon assignment
+        ship_weapons.delete(mysql, ship_id, ship_class_id, weapon_class_id)
+        
+        return format_response({
+            'status': 'success',
+            'message': f'Ship weapon assignment deleted successfully'
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to delete ship weapon assignment: {str(e)}'
         }, 500)
 
 # Error Handlers

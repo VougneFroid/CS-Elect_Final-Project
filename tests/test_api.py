@@ -694,6 +694,124 @@ class TestWeaponClassCRUD:
         assert 'not found' in data['message'].lower()
 
 
+class TestShipWeaponsCRUD:
+    # Test suite for ShipWeapons CRUD operations
+    
+    def test_get_all_ship_weapons_json(self, client):
+        # Test GET all ship weapons with JSON format
+        response = client.get('/api/ship-weapons')
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        data = json.loads(response.data)
+        assert 'ship_weapons' in data
+        assert isinstance(data['ship_weapons'], list)
+    
+    def test_get_all_ship_weapons_xml(self, client):
+        # Test GET all ship weapons with XML format
+        response = client.get('/api/ship-weapons?format=xml')
+        assert response.status_code == 200
+        assert response.content_type == 'application/xml'
+        assert b'<?xml' in response.data
+    
+    def test_get_ship_weapons_by_ship_id(self, client):
+        # Test GET weapons for a specific ship
+        response = client.get('/api/ship-weapons/ship/1')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ship_weapons' in data
+        assert isinstance(data['ship_weapons'], list)
+    
+    def test_get_ship_weapon_by_composite_key_not_found(self, client):
+        # Test GET specific assignment (not found)
+        response = client.get('/api/ship-weapons/999999/999999/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_create_ship_weapon_success(self, client):
+        # Test POST create new ship weapon assignment (success)
+        new_assignment = {
+            'ship_id': 1,
+            'ship_class_id': 1,
+            'weapon_class_id': 1,
+            'name': 'Test Weapon Mount'
+        }
+        response = client.post('/api/ship-weapons',
+                              data=json.dumps(new_assignment),
+                              content_type='application/json')
+        assert response.status_code == 201
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert 'ship_weapon' in data
+        assert data['ship_weapon']['name'] == 'Test Weapon Mount'
+        
+        # Clean up - delete the created assignment
+        client.delete(f'/api/ship-weapons/1/1/1')
+    
+    def test_create_ship_weapon_missing_field(self, client):
+        # Test POST create ship weapon with missing required field
+        incomplete_assignment = {
+            'ship_id': 1,
+            'ship_class_id': 1
+            # Missing weapon_class_id and name
+        }
+        response = client.post('/api/ship-weapons',
+                              data=json.dumps(incomplete_assignment),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'missing' in data['message'].lower() or 'required' in data['message'].lower()
+    
+    def test_create_ship_weapon_invalid_data_type(self, client):
+        # Test POST create ship weapon with invalid data type
+        invalid_assignment = {
+            'ship_id': 'not_a_number',  # Should be int
+            'ship_class_id': 1,
+            'weapon_class_id': 1,
+            'name': 'Invalid Assignment'
+        }
+        response = client.post('/api/ship-weapons',
+                              data=json.dumps(invalid_assignment),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+    
+    def test_delete_ship_weapon_success(self, client):
+        # Test DELETE ship weapon (success)
+        # First create an assignment to delete
+        new_assignment = {
+            'ship_id': 1,
+            'ship_class_id': 1,
+            'weapon_class_id': 1,
+            'name': 'Assignment To Delete'
+        }
+        create_response = client.post('/api/ship-weapons',
+                                     data=json.dumps(new_assignment),
+                                     content_type='application/json')
+        assert create_response.status_code == 201
+        
+        # Delete the assignment
+        response = client.delete('/api/ship-weapons/1/1/1')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        
+        # Verify it's deleted
+        get_response = client.get('/api/ship-weapons/1/1/1')
+        assert get_response.status_code == 404
+    
+    def test_delete_ship_weapon_not_found(self, client):
+        # Test DELETE ship weapon (not found)
+        response = client.delete('/api/ship-weapons/999999/999999/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+
+
 class TestErrorHandlers:
     # Test suite for error handlers
     

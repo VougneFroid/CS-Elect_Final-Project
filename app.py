@@ -2,8 +2,8 @@ import json
 from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from utils.formatters import format_response, row_to_dict, rows_to_dict_list
-from utils.validators import validate_pilot_data
-from models import pilot
+from utils.validators import validate_pilot_data, validate_ship_data
+from models import pilot, ship
 
 app = Flask(__name__)
 
@@ -22,6 +22,7 @@ def close_db(error):
 
 # Column definitions
 PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']
+SHIP_COLUMNS = ['id', 'name', 'capacity', 'speed', 'shield', 'ship_class_id', 'ship_class_name', 'pilot_id', 'pilot_name']
 
 @app.route('/')
 def home():
@@ -193,6 +194,148 @@ def delete_pilot(pilot_id):
         return format_response({
             'status': 'error',
             'message': f'Failed to delete pilot: {str(e)}'
+        }, 500)
+
+# Ship Endpoints
+@app.route('/api/ships', methods=['GET'])
+def get_ships():
+    # Get all ships
+    try:
+        ships_data = ship.get_all(mysql)
+        ships_list = rows_to_dict_list(ships_data, SHIP_COLUMNS)
+        return format_response({'ships': ships_list}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve ships: {str(e)}'
+        }, 500)
+
+@app.route('/api/ships/<int:ship_id>', methods=['GET'])
+def get_ship(ship_id):
+    # Get a single ship by ID
+    try:
+        ship_data = ship.get_by_id(mysql, ship_id)
+        if ship_data is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Ship with ID {ship_id} not found'
+            }, 404)
+        
+        ship_dict = row_to_dict(ship_data, SHIP_COLUMNS)
+        return format_response({'ship': ship_dict}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve ship: {str(e)}'
+        }, 500)
+
+@app.route('/api/ships', methods=['POST'])
+def create_ship():
+    # Create a new ship
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_ship_data(data, is_update=False)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Create ship
+        ship_id = ship.create(mysql, data)
+        
+        # Retrieve and return the created ship
+        created_ship = ship.get_by_id(mysql, ship_id)
+        ship_dict = row_to_dict(created_ship, SHIP_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Ship created successfully',
+            'ship': ship_dict
+        }, 201)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to create ship: {str(e)}'
+        }, 500)
+
+@app.route('/api/ships/<int:ship_id>', methods=['PUT'])
+def update_ship(ship_id):
+    # Update an existing ship
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_ship_data(data, is_update=True)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Check if ship exists
+        existing_ship = ship.get_by_id(mysql, ship_id)
+        if existing_ship is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Ship with ID {ship_id} not found'
+            }, 404)
+        
+        # Update ship
+        ship.update(mysql, ship_id, data)
+        
+        # Retrieve and return updated ship
+        updated_ship = ship.get_by_id(mysql, ship_id)
+        ship_dict = row_to_dict(updated_ship, SHIP_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Ship updated successfully',
+            'ship': ship_dict
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to update ship: {str(e)}'
+        }, 500)
+
+@app.route('/api/ships/<int:ship_id>', methods=['DELETE'])
+def delete_ship(ship_id):
+    # Delete a ship
+    try:
+        # Check if ship exists
+        existing_ship = ship.get_by_id(mysql, ship_id)
+        if existing_ship is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Ship with ID {ship_id} not found'
+            }, 404)
+        
+        # Delete ship (also deletes ship_weapons entries)
+        ship.delete(mysql, ship_id)
+        
+        return format_response({
+            'status': 'success',
+            'message': f'Ship with ID {ship_id} deleted successfully'
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to delete ship: {str(e)}'
         }, 500)
 
 # Error Handlers

@@ -3,7 +3,8 @@ from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from utils.formatters import format_response, row_to_dict, rows_to_dict_list
 from utils.validators import validate_pilot_data, validate_ship_data, validate_ship_class_data, validate_weapon_class_data
-from models import pilot, ship, ship_class, weapon_class, ship_weapons
+from utils.auth import token_required, generate_token, hash_password, verify_password
+from models import pilot, ship, ship_class, weapon_class, ship_weapons, user
 
 app = Flask(__name__)
 
@@ -26,6 +27,7 @@ SHIP_COLUMNS = ['id', 'name', 'capacity', 'speed', 'shield', 'ship_class_id', 's
 SHIP_CLASS_COLUMNS = ['id', 'name', 'description']
 WEAPON_CLASS_COLUMNS = ['id', 'class', 'damage', 'reload_speed', 'spread', 'range']
 SHIP_WEAPONS_COLUMNS = ['ship_id', 'ship_name', 'ship_class_id', 'ship_class_name', 'weapon_class_id', 'weapon_class_name', 'name']
+USER_COLUMNS = ['id', 'username', 'email', 'created_at']
 
 @app.route('/')
 def home():
@@ -56,6 +58,164 @@ def test_db():
             'status': 'error',
             'message': f'Database connection failed: {str(e)}'
         }), 500
+
+# Authentication Endpoints
+@app.route('/api/auth/register', methods=['POST'])
+def register():
+    """Register a new user"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate required fields
+        required_fields = ['username', 'email', 'password']
+        for field in required_fields:
+            if field not in data or not data[field]:
+                return format_response({
+                    'status': 'error',
+                    'message': f'Missing required field: {field}'
+                }, 400)
+        
+        # Validate username
+        username = data['username'].strip()
+        if len(username) < 3:
+            return format_response({
+                'status': 'error',
+                'message': 'Username must be at least 3 characters long'
+            }, 400)
+        
+        # Validate email format (basic validation)
+        email = data['email'].strip()
+        if '@' not in email or '.' not in email:
+            return format_response({
+                'status': 'error',
+                'message': 'Invalid email format'
+            }, 400)
+        
+        # Validate password
+        password = data['password']
+        if len(password) < 6:
+            return format_response({
+                'status': 'error',
+                'message': 'Password must be at least 6 characters long'
+            }, 400)
+        
+        # Check if username already exists
+        if user.username_exists(mysql, username):
+            return format_response({
+                'status': 'error',
+                'message': 'Username already exists'
+            }, 409)
+        
+        # Check if email already exists
+        if user.email_exists(mysql, email):
+            return format_response({
+                'status': 'error',
+                'message': 'Email already exists'
+            }, 409)
+        
+        # Hash password
+        password_hash = hash_password(password)
+        
+        # Create user
+        user_data = {
+            'username': username,
+            'email': email,
+            'password_hash': password_hash
+        }
+        user_id = user.create(mysql, user_data)
+        
+        # Generate token
+        token = generate_token(user_id, username)
+        
+        # Get created user
+        created_user = user.get_by_id(mysql, user_id)
+        user_dict = row_to_dict(created_user, USER_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'User registered successfully',
+            'token': token,
+            'user': user_dict
+        }, 201)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to register user: {str(e)}'
+        }, 500)
+
+@app.route('/api/auth/login', methods=['POST'])
+def login():
+    """Authenticate a user and return a JWT token"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate required fields
+        if 'username' not in data or 'password' not in data:
+            return format_response({
+                'status': 'error',
+                'message': 'Username and password are required'
+            }, 400)
+        
+        username = data['username']
+        password = data['password']
+        
+        # Get user by username
+        user_data = user.get_by_username(mysql, username)
+        
+        if not user_data:
+            return format_response({
+                'status': 'error',
+                'message': 'Invalid username or password'
+            }, 401)
+        
+        # user_data contains: (id, username, email, password_hash, created_at)
+        user_id = user_data[0]
+        stored_username = user_data[1]
+        email = user_data[2]
+        password_hash = user_data[3]
+        created_at = user_data[4]
+        
+        # Verify password
+        if not verify_password(password_hash, password):
+            return format_response({
+                'status': 'error',
+                'message': 'Invalid username or password'
+            }, 401)
+        
+        # Generate token
+        token = generate_token(user_id, stored_username)
+        
+        # Return user info (without password)
+        user_dict = {
+            'id': user_id,
+            'username': stored_username,
+            'email': email,
+            'created_at': str(created_at)
+        }
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Login successful',
+            'token': token,
+            'user': user_dict
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Login failed: {str(e)}'
+        }, 500)
 
 # Pilot Endpoints
 @app.route('/api/pilots', methods=['GET'])
@@ -127,7 +287,8 @@ def get_pilot(pilot_id):
         }, 500)
 
 @app.route('/api/pilots', methods=['POST'])
-def create_pilot():
+@token_required
+def create_pilot(current_user):
     # Create a new pilot
     try:
         data = request.get_json()
@@ -165,7 +326,8 @@ def create_pilot():
         }, 500)
 
 @app.route('/api/pilots/<int:pilot_id>', methods=['PUT'])
-def update_pilot(pilot_id):
+@token_required
+def update_pilot(current_user, pilot_id):
     # Update an existing pilot
     try:
         data = request.get_json()
@@ -211,7 +373,8 @@ def update_pilot(pilot_id):
         }, 500)
 
 @app.route('/api/pilots/<int:pilot_id>', methods=['DELETE'])
-def delete_pilot(pilot_id):
+@token_required
+def delete_pilot(current_user, pilot_id):
     # Delete a pilot
     try:
         # Check if pilot exists
@@ -355,7 +518,8 @@ def get_ship(ship_id):
         }, 500)
 
 @app.route('/api/ships', methods=['POST'])
-def create_ship():
+@token_required
+def create_ship(current_user):
     # Create a new ship
     try:
         data = request.get_json()
@@ -393,7 +557,8 @@ def create_ship():
         }, 500)
 
 @app.route('/api/ships/<int:ship_id>', methods=['PUT'])
-def update_ship(ship_id):
+@token_required
+def update_ship(current_user, ship_id):
     # Update an existing ship
     try:
         data = request.get_json()
@@ -439,7 +604,8 @@ def update_ship(ship_id):
         }, 500)
 
 @app.route('/api/ships/<int:ship_id>', methods=['DELETE'])
-def delete_ship(ship_id):
+@token_required
+def delete_ship(current_user, ship_id):
     # Delete a ship
     try:
         # Check if ship exists
@@ -513,7 +679,8 @@ def get_ship_class(class_id):
         }, 500)
 
 @app.route('/api/ship-classes', methods=['POST'])
-def create_ship_class():
+@token_required
+def create_ship_class(current_user):
     # Create a new ship class
     try:
         data = request.get_json()
@@ -551,7 +718,8 @@ def create_ship_class():
         }, 500)
 
 @app.route('/api/ship-classes/<int:class_id>', methods=['PUT'])
-def update_ship_class(class_id):
+@token_required
+def update_ship_class(current_user, class_id):
     # Update an existing ship class
     try:
         data = request.get_json()
@@ -597,7 +765,8 @@ def update_ship_class(class_id):
         }, 500)
 
 @app.route('/api/ship-classes/<int:class_id>', methods=['DELETE'])
-def delete_ship_class(class_id):
+@token_required
+def delete_ship_class(current_user, class_id):
     # Delete a ship class
     try:
         # Check if ship class exists
@@ -739,7 +908,8 @@ def get_weapon_class(weapon_id):
         }, 500)
 
 @app.route('/api/weapon-classes', methods=['POST'])
-def create_weapon_class():
+@token_required
+def create_weapon_class(current_user):
     # Create a new weapon class
     try:
         data = request.get_json()
@@ -777,7 +947,8 @@ def create_weapon_class():
         }, 500)
 
 @app.route('/api/weapon-classes/<int:weapon_id>', methods=['PUT'])
-def update_weapon_class(weapon_id):
+@token_required
+def update_weapon_class(current_user, weapon_id):
     # Update an existing weapon class
     try:
         data = request.get_json()
@@ -823,7 +994,8 @@ def update_weapon_class(weapon_id):
         }, 500)
 
 @app.route('/api/weapon-classes/<int:weapon_id>', methods=['DELETE'])
-def delete_weapon_class(weapon_id):
+@token_required
+def delete_weapon_class(current_user, weapon_id):
     # Delete a weapon class
     try:
         # Check if weapon class exists
@@ -894,7 +1066,8 @@ def get_ship_weapon(ship_id, ship_class_id, weapon_class_id):
         }, 500)
 
 @app.route('/api/ship-weapons', methods=['POST'])
-def create_ship_weapon():
+@token_required
+def create_ship_weapon(current_user):
     # Create a new ship weapon assignment
     try:
         data = request.get_json()
@@ -960,7 +1133,8 @@ def create_ship_weapon():
         }, 500)
 
 @app.route('/api/ship-weapons/<int:ship_id>/<int:ship_class_id>/<int:weapon_class_id>', methods=['DELETE'])
-def delete_ship_weapon(ship_id, ship_class_id, weapon_class_id):
+@token_required
+def delete_ship_weapon(current_user, ship_id, ship_class_id, weapon_class_id):
     # Delete a ship weapon assignment
     try:
         # Check if assignment exists

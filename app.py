@@ -624,9 +624,93 @@ def delete_ship_class(class_id):
 # WeaponClass Endpoints
 @app.route('/api/weapon-classes', methods=['GET'])
 def get_weapon_classes():
-    # Get all weapon classes
+    # Get all weapon classes or search with criteria
     try:
-        weapon_classes_data = weapon_class.get_all(mysql)
+        # Check for search parameters
+        criteria = {}
+        
+        # Class name search (string)
+        if request.args.get('class'):
+            criteria['class'] = request.args.get('class')
+        
+        # Damage range (numeric)
+        if request.args.get('min_damage'):
+            try:
+                criteria['min_damage'] = int(request.args.get('min_damage'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_damage must be a valid integer'
+                }, 400)
+        if request.args.get('max_damage'):
+            try:
+                criteria['max_damage'] = int(request.args.get('max_damage'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_damage must be a valid integer'
+                }, 400)
+        
+        # Reload speed range (numeric)
+        if request.args.get('min_reload_speed'):
+            try:
+                criteria['min_reload_speed'] = int(request.args.get('min_reload_speed'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_reload_speed must be a valid integer'
+                }, 400)
+        if request.args.get('max_reload_speed'):
+            try:
+                criteria['max_reload_speed'] = int(request.args.get('max_reload_speed'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_reload_speed must be a valid integer'
+                }, 400)
+        
+        # Spread range (numeric)
+        if request.args.get('min_spread'):
+            try:
+                criteria['min_spread'] = int(request.args.get('min_spread'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_spread must be a valid integer'
+                }, 400)
+        if request.args.get('max_spread'):
+            try:
+                criteria['max_spread'] = int(request.args.get('max_spread'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_spread must be a valid integer'
+                }, 400)
+        
+        # Range range (numeric)
+        if request.args.get('min_range'):
+            try:
+                criteria['min_range'] = int(request.args.get('min_range'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_range must be a valid integer'
+                }, 400)
+        if request.args.get('max_range'):
+            try:
+                criteria['max_range'] = int(request.args.get('max_range'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_range must be a valid integer'
+                }, 400)
+        
+        # Use search if criteria provided, otherwise get all
+        if criteria:
+            weapon_classes_data = weapon_class.search(mysql, criteria)
+        else:
+            weapon_classes_data = weapon_class.get_all(mysql)
+        
         weapon_classes_list = rows_to_dict_list(weapon_classes_data, WEAPON_CLASS_COLUMNS)
         return format_response({'weapon_classes': weapon_classes_list}, 200)
     except Exception as e:

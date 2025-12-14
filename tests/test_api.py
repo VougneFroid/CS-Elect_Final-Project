@@ -825,6 +825,42 @@ class TestWeaponClassCRUD:
         data = json.loads(response.data)
         assert data['status'] == 'error'
         assert 'not found' in data['message'].lower()
+    
+    def test_search_weapon_classes_by_class(self, client):
+        # Test search weapon classes by class name (LIKE search)
+        response = client.get('/api/weapon-classes?class=Laser')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'weapon_classes' in data
+        assert isinstance(data['weapon_classes'], list)
+    
+    def test_search_weapon_classes_by_damage_range(self, client):
+        # Test search weapon classes by damage range
+        response = client.get('/api/weapon-classes?min_damage=30&max_damage=60')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'weapon_classes' in data
+        assert isinstance(data['weapon_classes'], list)
+        for weapon in data['weapon_classes']:
+            assert 30 <= weapon['damage'] <= 60
+    
+    def test_search_weapon_classes_by_range(self, client):
+        # Test search weapon classes by range
+        response = client.get('/api/weapon-classes?min_range=800')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'weapon_classes' in data
+        assert isinstance(data['weapon_classes'], list)
+        for weapon in data['weapon_classes']:
+            assert weapon['range'] >= 800
+    
+    def test_search_weapon_classes_invalid_parameter(self, client):
+        # Test search with invalid numeric parameter
+        response = client.get('/api/weapon-classes?min_damage=invalid')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'integer' in data['message'].lower()
 
 
 class TestShipWeaponsCRUD:

@@ -82,3 +82,60 @@ def delete(mysql, weapon_id):
     rows_affected = cursor.rowcount
     cursor.close()
     return rows_affected
+
+
+def search(mysql, criteria):
+    # Search weapon classes based on criteria
+    cursor = mysql.connection.cursor()
+    
+    # Build dynamic WHERE clause
+    where_clauses = []
+    values = []
+    
+    # Class name search (LIKE - partial match)
+    if 'class' in criteria and criteria['class']:
+        where_clauses.append('class LIKE %s')
+        values.append(f"%{criteria['class']}%")
+    
+    # Damage range
+    if 'min_damage' in criteria and criteria['min_damage'] is not None:
+        where_clauses.append('damage >= %s')
+        values.append(criteria['min_damage'])
+    if 'max_damage' in criteria and criteria['max_damage'] is not None:
+        where_clauses.append('damage <= %s')
+        values.append(criteria['max_damage'])
+    
+    # Reload speed range
+    if 'min_reload_speed' in criteria and criteria['min_reload_speed'] is not None:
+        where_clauses.append('reload_speed >= %s')
+        values.append(criteria['min_reload_speed'])
+    if 'max_reload_speed' in criteria and criteria['max_reload_speed'] is not None:
+        where_clauses.append('reload_speed <= %s')
+        values.append(criteria['max_reload_speed'])
+    
+    # Spread range
+    if 'min_spread' in criteria and criteria['min_spread'] is not None:
+        where_clauses.append('spread >= %s')
+        values.append(criteria['min_spread'])
+    if 'max_spread' in criteria and criteria['max_spread'] is not None:
+        where_clauses.append('spread <= %s')
+        values.append(criteria['max_spread'])
+    
+    # Range range
+    if 'min_range' in criteria and criteria['min_range'] is not None:
+        where_clauses.append('`range` >= %s')
+        values.append(criteria['min_range'])
+    if 'max_range' in criteria and criteria['max_range'] is not None:
+        where_clauses.append('`range` <= %s')
+        values.append(criteria['max_range'])
+    
+    # Build query
+    query = 'SELECT id, class, damage, reload_speed, spread, `range` FROM weapon_class'
+    if where_clauses:
+        query += ' WHERE ' + ' AND '.join(where_clauses)
+    query += ' ORDER BY id'
+    
+    cursor.execute(query, values)
+    weapon_classes = cursor.fetchall()
+    cursor.close()
+    return weapon_classes

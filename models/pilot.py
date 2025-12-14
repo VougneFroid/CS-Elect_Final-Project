@@ -77,3 +77,43 @@ def delete(mysql, pilot_id):
     rows_affected = cursor.rowcount
     cursor.close()
     return rows_affected
+
+
+def search(mysql, criteria):
+    # Search pilots based on criteria
+    cursor = mysql.connection.cursor()
+    
+    # Build dynamic WHERE clause
+    where_clauses = []
+    values = []
+    
+    # Name search (LIKE - partial match)
+    if 'name' in criteria and criteria['name']:
+        where_clauses.append('name LIKE %s')
+        values.append(f"%{criteria['name']}%")
+    
+    # Rank search (exact match)
+    if 'rank' in criteria and criteria['rank']:
+        where_clauses.append('rank = %s')
+        values.append(criteria['rank'])
+    
+    # Minimum flight years
+    if 'min_flight_years' in criteria and criteria['min_flight_years'] is not None:
+        where_clauses.append('flight_years >= %s')
+        values.append(criteria['min_flight_years'])
+    
+    # Minimum mission success
+    if 'min_mission_success' in criteria and criteria['min_mission_success'] is not None:
+        where_clauses.append('mission_success >= %s')
+        values.append(criteria['min_mission_success'])
+    
+    # Build query
+    query = 'SELECT id, name, flight_years, rank, mission_success FROM pilot'
+    if where_clauses:
+        query += ' WHERE ' + ' AND '.join(where_clauses)
+    query += ' ORDER BY id'
+    
+    cursor.execute(query, values)
+    pilots = cursor.fetchall()
+    cursor.close()
+    return pilots

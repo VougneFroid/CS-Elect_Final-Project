@@ -14,6 +14,12 @@ app.config['MYSQL_DB'] = 'shiperd'
 
 mysql = MySQL(app)
 
+# Teardown handler for MySQL connections
+@app.teardown_appcontext
+def close_db(error):
+    # Close database connection after each request
+    pass
+
 # Column definitions
 PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']
 

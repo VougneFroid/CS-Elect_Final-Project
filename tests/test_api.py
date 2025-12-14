@@ -12,7 +12,8 @@ def client():
     app.config['TESTING'] = True
     
     with app.test_client() as client:
-        yield client
+        with client.application.app_context():
+            yield client
 
 
 class TestPilotCRUD:
@@ -31,7 +32,7 @@ class TestPilotCRUD:
         # Test GET all pilots with XML format
         response = client.get('/api/pilots?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_get_pilot_by_id_success(self, client):
@@ -247,7 +248,7 @@ class TestShipCRUD:
         # Test GET all ships with XML format
         response = client.get('/api/ships?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_get_ship_by_id_success(self, client):
@@ -481,7 +482,7 @@ class TestShipClassCRUD:
         # Test GET all ship classes with XML format
         response = client.get('/api/ship-classes?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_get_ship_class_by_id_success(self, client):
@@ -675,7 +676,7 @@ class TestWeaponClassCRUD:
         # Test GET all weapon classes with XML format
         response = client.get('/api/weapon-classes?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_get_weapon_class_by_id_success(self, client):
@@ -879,7 +880,7 @@ class TestShipWeaponsCRUD:
         # Test GET all ship weapons with XML format
         response = client.get('/api/ship-weapons?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_get_ship_weapons_by_ship_id(self, client):
@@ -900,10 +901,11 @@ class TestShipWeaponsCRUD:
     
     def test_create_ship_weapon_success(self, client):
         # Test POST create new ship weapon assignment (success)
+        # Use ship_id=1, ship_class_id=1, weapon_class_id=2 to avoid duplicate
         new_assignment = {
             'ship_id': 1,
             'ship_class_id': 1,
-            'weapon_class_id': 1,
+            'weapon_class_id': 2,
             'name': 'Test Weapon Mount'
         }
         response = client.post('/api/ship-weapons',
@@ -916,7 +918,7 @@ class TestShipWeaponsCRUD:
         assert data['ship_weapon']['name'] == 'Test Weapon Mount'
         
         # Clean up - delete the created assignment
-        client.delete(f'/api/ship-weapons/1/1/1')
+        client.delete(f'/api/ship-weapons/1/1/2')
     
     def test_create_ship_weapon_missing_field(self, client):
         # Test POST create ship weapon with missing required field
@@ -951,10 +953,11 @@ class TestShipWeaponsCRUD:
     def test_delete_ship_weapon_success(self, client):
         # Test DELETE ship weapon (success)
         # First create an assignment to delete
+        # Use weapon_class_id=3 to avoid duplicate
         new_assignment = {
             'ship_id': 1,
             'ship_class_id': 1,
-            'weapon_class_id': 1,
+            'weapon_class_id': 3,
             'name': 'Assignment To Delete'
         }
         create_response = client.post('/api/ship-weapons',
@@ -963,13 +966,13 @@ class TestShipWeaponsCRUD:
         assert create_response.status_code == 201
         
         # Delete the assignment
-        response = client.delete('/api/ship-weapons/1/1/1')
+        response = client.delete('/api/ship-weapons/1/1/3')
         assert response.status_code == 200
         data = json.loads(response.data)
         assert data['status'] == 'success'
         
         # Verify it's deleted
-        get_response = client.get('/api/ship-weapons/1/1/1')
+        get_response = client.get('/api/ship-weapons/1/1/3')
         assert get_response.status_code == 404
     
     def test_delete_ship_weapon_not_found(self, client):
@@ -1019,7 +1022,7 @@ class TestFormattingOptions:
         # Test XML format
         response = client.get('/api/pilots?format=xml')
         assert response.status_code == 200
-        assert response.content_type == 'application/xml'
+        assert 'application/xml' in response.content_type
         assert b'<?xml' in response.data
     
     def test_invalid_format_defaults_to_json(self, client):

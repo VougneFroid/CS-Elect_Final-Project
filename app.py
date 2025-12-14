@@ -11,14 +11,9 @@ app.config['MYSQL_HOST'] = 'localhost'
 app.config['MYSQL_USER'] = 'root'
 app.config['MYSQL_PASSWORD'] = 'vondev'
 app.config['MYSQL_DB'] = 'shiperd'
+app.config['MYSQL_CONNECT_TIMEOUT'] = 10
 
 mysql = MySQL(app)
-
-# Teardown handler for MySQL connections
-@app.teardown_appcontext
-def close_db(error):
-    # Close database connection after each request
-    pass
 
 # Column definitions
 PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']

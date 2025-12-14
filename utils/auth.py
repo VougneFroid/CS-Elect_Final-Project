@@ -15,41 +15,21 @@ JWT_ALGORITHM = 'HS256'
 TOKEN_EXPIRATION_HOURS = 24
 
 def hash_password(password):
-    """
-    Hash a password using Werkzeug's security functions.
-    
-    Args:
-        password (str): Plain text password
-        
-    Returns:
-        str: Hashed password
-    """
+
+    # Hash a password using Werkzeug's security functions.
+
     return generate_password_hash(password)
 
 def verify_password(password_hash, password):
-    """
-    Verify a password against its hash.
+
+    # Verify a password against its hash.
     
-    Args:
-        password_hash (str): Hashed password
-        password (str): Plain text password to verify
-        
-    Returns:
-        bool: True if password matches, False otherwise
-    """
     return check_password_hash(password_hash, password)
 
 def generate_token(user_id, username):
-    """
-    Generate a JWT token for a user.
-    
-    Args:
-        user_id (int): User's ID
-        username (str): User's username
-        
-    Returns:
-        str: JWT token
-    """
+
+    # Generate a JWT token for a user.
+
     payload = {
         'user_id': user_id,
         'username': username,
@@ -61,15 +41,9 @@ def generate_token(user_id, username):
     return token
 
 def decode_token(token):
-    """
-    Decode and validate a JWT token.
     
-    Args:
-        token (str): JWT token
-        
-    Returns:
-        dict: Decoded token payload if valid, None otherwise
-    """
+    # Decode and validate a JWT token.
+    
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[JWT_ALGORITHM])
         return payload
@@ -79,15 +53,9 @@ def decode_token(token):
         return None  # Invalid token
 
 def token_required(f):
-    """
-    Decorator to protect routes that require authentication.
-    
-    Usage:
-        @app.route('/api/protected')
-        @token_required
-        def protected_route(current_user):
-            return jsonify({'message': 'Access granted', 'user': current_user})
-    """
+
+    # Decorator to protect routes that require authentication.
+
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None

@@ -24,9 +24,9 @@ def test_authentication():
     # Test 1: Register a new user
     print("\n🔹 TEST 1: Register a new user")
     register_data = {
-        "username": "testpilot",
-        "email": "testpilot@example.com",
-        "password": "secure123"
+        "username": "teasdpilot",
+        "email": "testpilot@asdsdawe.com",
+        "password": "e123123"
     }
     response = requests.post(f"{BASE_URL}/api/auth/register", json=register_data)
     print_response("Registration Response", response)
@@ -38,8 +38,8 @@ def test_authentication():
         print("\n⚠️  User already exists, trying to login instead...")
         # Test 2: Login with existing user
         login_data = {
-            "username": "testpilot",
-            "password": "secure123"
+            "username": "teasdpilot",
+            "password": "e123123"
         }
         response = requests.post(f"{BASE_URL}/api/auth/login", json=login_data)
         print_response("Login Response", response)

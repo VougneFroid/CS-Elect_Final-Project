@@ -1,4 +1,6 @@
 import json
+import os
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
 from utils.formatters import format_response, row_to_dict, rows_to_dict_list
@@ -6,12 +8,16 @@ from utils.validators import validate_pilot_data, validate_ship_data, validate_s
 from utils.auth import token_required, generate_token, hash_password, verify_password
 from models import pilot, ship, ship_class, weapon_class, ship_weapons, user
 
+# Load environment variables from .env file
+load_dotenv()
+
 app = Flask(__name__)
 
-app.config['MYSQL_HOST'] = 'localhost'
-app.config['MYSQL_USER'] = 'root'
-app.config['MYSQL_PASSWORD'] = 'vondev'
-app.config['MYSQL_DB'] = 'shiperd'
+# Database configuration from environment variables
+app.config['MYSQL_HOST'] = os.getenv('MYSQL_HOST', 'localhost')
+app.config['MYSQL_USER'] = os.getenv('MYSQL_USER', 'root')
+app.config['MYSQL_PASSWORD'] = os.getenv('MYSQL_PASSWORD', 'vondev')
+app.config['MYSQL_DB'] = os.getenv('MYSQL_DB', 'shiperd')
 
 mysql = MySQL(app)
 

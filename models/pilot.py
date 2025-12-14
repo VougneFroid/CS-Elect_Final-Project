@@ -2,7 +2,7 @@ def get_all(mysql):
     # Get all pilots from the database
     cursor = mysql.connection.cursor()
     cursor.execute('''
-        SELECT id, name, flight_years, rank, mission_success 
+        SELECT id, name, flight_years, `rank`, mission_success 
         FROM pilot
         ORDER BY id
     ''')
@@ -15,7 +15,7 @@ def get_by_id(mysql, pilot_id):
     # Get a specific pilot by ID
     cursor = mysql.connection.cursor()
     cursor.execute('''
-        SELECT id, name, flight_years, rank, mission_success 
+        SELECT id, name, flight_years, `rank`, mission_success 
         FROM pilot 
         WHERE id = %s
     ''', (pilot_id,))
@@ -28,7 +28,7 @@ def create(mysql, data):
     # Create a new pilot
     cursor = mysql.connection.cursor()
     cursor.execute('''
-        INSERT INTO pilot (name, flight_years, rank, mission_success)
+        INSERT INTO pilot (name, flight_years, `rank`, mission_success)
         VALUES (%s, %s, %s, %s)
     ''', (data['name'], data['flight_years'], data['rank'], data['mission_success']))
     mysql.connection.commit()
@@ -51,7 +51,7 @@ def update(mysql, pilot_id, data):
         values.append(data['flight_years'])
     
     if 'rank' in data:
-        update_fields.append('rank = %s')
+        update_fields.append('`rank` = %s')
         values.append(data['rank'])
     
     if 'mission_success' in data:
@@ -94,7 +94,7 @@ def search(mysql, criteria):
     
     # Rank search (exact match)
     if 'rank' in criteria and criteria['rank']:
-        where_clauses.append('rank = %s')
+        where_clauses.append('`rank` = %s')
         values.append(criteria['rank'])
     
     # Minimum flight years
@@ -108,12 +108,17 @@ def search(mysql, criteria):
         values.append(criteria['min_mission_success'])
     
     # Build query
-    query = 'SELECT id, name, flight_years, rank, mission_success FROM pilot'
+    query = 'SELECT id, name, flight_years, `rank`, mission_success FROM pilot'
     if where_clauses:
         query += ' WHERE ' + ' AND '.join(where_clauses)
     query += ' ORDER BY id'
     
-    cursor.execute(query, values)
+    # Execute with or without values
+    if values:
+        cursor.execute(query, values)
+    else:
+        cursor.execute(query)
+    
     pilots = cursor.fetchall()
     cursor.close()
     return pilots

@@ -11,11 +11,6 @@ def client():
     # Configure test client
     app.config['TESTING'] = True
     
-    # Add teardown handler to properly close MySQL connections
-    @app.teardown_appcontext
-    def shutdown_session(exception=None):
-        pass
-    
     with app.test_client() as client:
         yield client
 
@@ -182,6 +177,58 @@ class TestPilotCRUD:
         data = json.loads(response.data)
         assert data['status'] == 'error'
         assert 'not found' in data['message'].lower()
+    
+    def test_search_pilots_by_name(self, client):
+        # Test search pilots by name (LIKE search)
+        response = client.get('/api/pilots?name=John')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'pilots' in data
+        assert isinstance(data['pilots'], list)
+        # If results exist, verify name contains search term
+        for pilot in data['pilots']:
+            assert 'john' in pilot['name'].lower()
+    
+    def test_search_pilots_by_rank(self, client):
+        # Test search pilots by rank (exact match)
+        response = client.get('/api/pilots?rank=Captain')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'pilots' in data
+        assert isinstance(data['pilots'], list)
+        # If results exist, verify rank matches exactly
+        for pilot in data['pilots']:
+            assert pilot['rank'] == 'Captain'
+    
+    def test_search_pilots_by_min_flight_years(self, client):
+        # Test search pilots by minimum flight years
+        response = client.get('/api/pilots?min_flight_years=5')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'pilots' in data
+        assert isinstance(data['pilots'], list)
+        # If results exist, verify flight_years >= 5
+        for pilot in data['pilots']:
+            assert pilot['flight_years'] >= 5
+    
+    def test_search_pilots_by_min_mission_success(self, client):
+        # Test search pilots by minimum mission success
+        response = client.get('/api/pilots?min_mission_success=10')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'pilots' in data
+        assert isinstance(data['pilots'], list)
+        # If results exist, verify mission_success >= 10
+        for pilot in data['pilots']:
+            assert pilot['mission_success'] >= 10
+    
+    def test_search_pilots_invalid_parameter(self, client):
+        # Test search with invalid numeric parameter
+        response = client.get('/api/pilots?min_flight_years=invalid')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'integer' in data['message'].lower()
 
 
 class TestShipCRUD:

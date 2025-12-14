@@ -526,6 +526,174 @@ class TestShipClassCRUD:
         assert 'not found' in data['message'].lower()
 
 
+class TestWeaponClassCRUD:
+    # Test suite for WeaponClass CRUD operations
+    
+    def test_get_all_weapon_classes_json(self, client):
+        # Test GET all weapon classes with JSON format
+        response = client.get('/api/weapon-classes')
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        data = json.loads(response.data)
+        assert 'weapon_classes' in data
+        assert isinstance(data['weapon_classes'], list)
+    
+    def test_get_all_weapon_classes_xml(self, client):
+        # Test GET all weapon classes with XML format
+        response = client.get('/api/weapon-classes?format=xml')
+        assert response.status_code == 200
+        assert response.content_type == 'application/xml'
+        assert b'<?xml' in response.data
+    
+    def test_get_weapon_class_by_id_success(self, client):
+        # Test GET single weapon class by ID (success)
+        response = client.get('/api/weapon-classes/1')
+        assert response.status_code in [200, 404]  # 404 if weapon class doesn't exist
+        if response.status_code == 200:
+            data = json.loads(response.data)
+            assert 'weapon_class' in data
+            assert data['weapon_class']['id'] == 1
+    
+    def test_get_weapon_class_by_id_not_found(self, client):
+        # Test GET single weapon class by ID (not found)
+        response = client.get('/api/weapon-classes/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_create_weapon_class_success(self, client):
+        # Test POST create new weapon class (success)
+        new_weapon_class = {
+            'class': 'Test Laser',
+            'damage': 50,
+            'reload_speed': 10,
+            'spread': 5,
+            'range': 1000
+        }
+        response = client.post('/api/weapon-classes',
+                              data=json.dumps(new_weapon_class),
+                              content_type='application/json')
+        assert response.status_code == 201
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert 'weapon_class' in data
+        assert data['weapon_class']['class'] == 'Test Laser'
+        
+        # Clean up - delete the created weapon class
+        weapon_id = data['weapon_class']['id']
+        client.delete(f'/api/weapon-classes/{weapon_id}')
+    
+    def test_create_weapon_class_missing_field(self, client):
+        # Test POST create weapon class with missing required field
+        incomplete_weapon_class = {
+            'class': 'Incomplete Weapon',
+            'damage': 30
+            # Missing reload_speed, spread, range
+        }
+        response = client.post('/api/weapon-classes',
+                              data=json.dumps(incomplete_weapon_class),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'missing' in data['message'].lower() or 'required' in data['message'].lower()
+    
+    def test_create_weapon_class_invalid_data_type(self, client):
+        # Test POST create weapon class with invalid data type
+        invalid_weapon_class = {
+            'class': 'Invalid Weapon',
+            'damage': 'not_a_number',  # Should be int
+            'reload_speed': 8,
+            'spread': 3,
+            'range': 800
+        }
+        response = client.post('/api/weapon-classes',
+                              data=json.dumps(invalid_weapon_class),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+    
+    def test_update_weapon_class_success(self, client):
+        # Test PUT update weapon class (success)
+        # First create a weapon class to update
+        new_weapon_class = {
+            'class': 'Weapon To Update',
+            'damage': 40,
+            'reload_speed': 12,
+            'spread': 4,
+            'range': 900
+        }
+        create_response = client.post('/api/weapon-classes',
+                                     data=json.dumps(new_weapon_class),
+                                     content_type='application/json')
+        weapon_id = json.loads(create_response.data)['weapon_class']['id']
+        
+        # Update the weapon class
+        update_data = {
+            'damage': 60,
+            'range': 1200
+        }
+        response = client.put(f'/api/weapon-classes/{weapon_id}',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert data['weapon_class']['damage'] == 60
+        assert data['weapon_class']['range'] == 1200
+        
+        # Clean up
+        client.delete(f'/api/weapon-classes/{weapon_id}')
+    
+    def test_update_weapon_class_not_found(self, client):
+        # Test PUT update weapon class (not found)
+        update_data = {
+            'damage': 100
+        }
+        response = client.put('/api/weapon-classes/999999',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_delete_weapon_class_success(self, client):
+        # Test DELETE weapon class (success)
+        # First create a weapon class to delete
+        new_weapon_class = {
+            'class': 'Weapon To Delete',
+            'damage': 25,
+            'reload_speed': 15,
+            'spread': 2,
+            'range': 700
+        }
+        create_response = client.post('/api/weapon-classes',
+                                     data=json.dumps(new_weapon_class),
+                                     content_type='application/json')
+        weapon_id = json.loads(create_response.data)['weapon_class']['id']
+        
+        # Delete the weapon class
+        response = client.delete(f'/api/weapon-classes/{weapon_id}')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        
+        # Verify it's deleted
+        get_response = client.get(f'/api/weapon-classes/{weapon_id}')
+        assert get_response.status_code == 404
+    
+    def test_delete_weapon_class_not_found(self, client):
+        # Test DELETE weapon class (not found)
+        response = client.delete('/api/weapon-classes/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+
+
 class TestErrorHandlers:
     # Test suite for error handlers
     

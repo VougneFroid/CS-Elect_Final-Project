@@ -238,9 +238,95 @@ def delete_pilot(pilot_id):
 # Ship Endpoints
 @app.route('/api/ships', methods=['GET'])
 def get_ships():
-    # Get all ships
+    # Get all ships or search with criteria
     try:
-        ships_data = ship.get_all(mysql)
+        # Check for search parameters
+        criteria = {}
+        
+        # Name search (string)
+        if request.args.get('name'):
+            criteria['name'] = request.args.get('name')
+        
+        # Ship class ID (numeric)
+        if request.args.get('ship_class_id'):
+            try:
+                criteria['ship_class_id'] = int(request.args.get('ship_class_id'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'ship_class_id must be a valid integer'
+                }, 400)
+        
+        # Pilot ID (numeric)
+        if request.args.get('pilot_id'):
+            try:
+                criteria['pilot_id'] = int(request.args.get('pilot_id'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'pilot_id must be a valid integer'
+                }, 400)
+        
+        # Capacity range (numeric)
+        if request.args.get('min_capacity'):
+            try:
+                criteria['min_capacity'] = int(request.args.get('min_capacity'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_capacity must be a valid integer'
+                }, 400)
+        if request.args.get('max_capacity'):
+            try:
+                criteria['max_capacity'] = int(request.args.get('max_capacity'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_capacity must be a valid integer'
+                }, 400)
+        
+        # Speed range (numeric)
+        if request.args.get('min_speed'):
+            try:
+                criteria['min_speed'] = int(request.args.get('min_speed'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_speed must be a valid integer'
+                }, 400)
+        if request.args.get('max_speed'):
+            try:
+                criteria['max_speed'] = int(request.args.get('max_speed'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_speed must be a valid integer'
+                }, 400)
+        
+        # Shield range (numeric)
+        if request.args.get('min_shield'):
+            try:
+                criteria['min_shield'] = int(request.args.get('min_shield'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_shield must be a valid integer'
+                }, 400)
+        if request.args.get('max_shield'):
+            try:
+                criteria['max_shield'] = int(request.args.get('max_shield'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'max_shield must be a valid integer'
+                }, 400)
+        
+        # Use search if criteria provided, otherwise get all
+        if criteria:
+            ships_data = ship.search(mysql, criteria)
+        else:
+            ships_data = ship.get_all(mysql)
+        
         ships_list = rows_to_dict_list(ships_data, SHIP_COLUMNS)
         return format_response({'ships': ships_list}, 200)
     except Exception as e:

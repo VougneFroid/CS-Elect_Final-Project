@@ -100,3 +100,70 @@ def delete(mysql, ship_id):
     rows_affected = cursor.rowcount
     cursor.close()
     return rows_affected
+
+
+def search(mysql, criteria):
+    # Search ships based on criteria
+    cursor = mysql.connection.cursor()
+    
+    # Build dynamic WHERE clause
+    where_clauses = []
+    values = []
+    
+    # Name search (LIKE - partial match)
+    if 'name' in criteria and criteria['name']:
+        where_clauses.append('s.name LIKE %s')
+        values.append(f"%{criteria['name']}%")
+    
+    # Ship class ID (exact match)
+    if 'ship_class_id' in criteria and criteria['ship_class_id'] is not None:
+        where_clauses.append('s.ship_class_id = %s')
+        values.append(criteria['ship_class_id'])
+    
+    # Pilot ID (exact match)
+    if 'pilot_id' in criteria and criteria['pilot_id'] is not None:
+        where_clauses.append('s.pilot_id = %s')
+        values.append(criteria['pilot_id'])
+    
+    # Capacity range
+    if 'min_capacity' in criteria and criteria['min_capacity'] is not None:
+        where_clauses.append('s.capacity >= %s')
+        values.append(criteria['min_capacity'])
+    if 'max_capacity' in criteria and criteria['max_capacity'] is not None:
+        where_clauses.append('s.capacity <= %s')
+        values.append(criteria['max_capacity'])
+    
+    # Speed range
+    if 'min_speed' in criteria and criteria['min_speed'] is not None:
+        where_clauses.append('s.speed >= %s')
+        values.append(criteria['min_speed'])
+    if 'max_speed' in criteria and criteria['max_speed'] is not None:
+        where_clauses.append('s.speed <= %s')
+        values.append(criteria['max_speed'])
+    
+    # Shield range
+    if 'min_shield' in criteria and criteria['min_shield'] is not None:
+        where_clauses.append('s.shield >= %s')
+        values.append(criteria['min_shield'])
+    if 'max_shield' in criteria and criteria['max_shield'] is not None:
+        where_clauses.append('s.shield <= %s')
+        values.append(criteria['max_shield'])
+    
+    # Build query
+    query = '''
+        SELECT s.id, s.name, s.capacity, s.speed, s.shield, 
+               s.ship_class_id, sc.name as ship_class_name,
+               s.pilot_id, p.name as pilot_name
+        FROM ship s
+        LEFT JOIN ship_class sc ON s.ship_class_id = sc.id
+        LEFT JOIN pilot p ON s.pilot_id = p.id
+    '''
+    
+    if where_clauses:
+        query += ' WHERE ' + ' AND '.join(where_clauses)
+    query += ' ORDER BY s.id'
+    
+    cursor.execute(query, values)
+    ships = cursor.fetchall()
+    cursor.close()
+    return ships

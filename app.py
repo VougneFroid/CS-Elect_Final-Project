@@ -466,9 +466,25 @@ def delete_ship(ship_id):
 # ShipClass Endpoints
 @app.route('/api/ship-classes', methods=['GET'])
 def get_ship_classes():
-    # Get all ship classes
+    # Get all ship classes or search with criteria
     try:
-        ship_classes_data = ship_class.get_all(mysql)
+        # Check for search parameters
+        criteria = {}
+        
+        # Name search (string)
+        if request.args.get('name'):
+            criteria['name'] = request.args.get('name')
+        
+        # Description search (string)
+        if request.args.get('description'):
+            criteria['description'] = request.args.get('description')
+        
+        # Use search if criteria provided, otherwise get all
+        if criteria:
+            ship_classes_data = ship_class.search(mysql, criteria)
+        else:
+            ship_classes_data = ship_class.get_all(mysql)
+        
         ship_classes_list = rows_to_dict_list(ship_classes_data, SHIP_CLASS_COLUMNS)
         return format_response({'ship_classes': ship_classes_list}, 200)
     except Exception as e:

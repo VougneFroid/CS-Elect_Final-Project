@@ -73,3 +73,33 @@ def delete(mysql, class_id):
     rows_affected = cursor.rowcount
     cursor.close()
     return rows_affected
+
+
+def search(mysql, criteria):
+    # Search ship classes based on criteria
+    cursor = mysql.connection.cursor()
+    
+    # Build dynamic WHERE clause
+    where_clauses = []
+    values = []
+    
+    # Name search (LIKE - partial match)
+    if 'name' in criteria and criteria['name']:
+        where_clauses.append('name LIKE %s')
+        values.append(f"%{criteria['name']}%")
+    
+    # Description search (LIKE - partial match)
+    if 'description' in criteria and criteria['description']:
+        where_clauses.append('description LIKE %s')
+        values.append(f"%{criteria['description']}%")
+    
+    # Build query
+    query = 'SELECT id, name, description FROM ship_class'
+    if where_clauses:
+        query += ' WHERE ' + ' AND '.join(where_clauses)
+    query += ' ORDER BY id'
+    
+    cursor.execute(query, values)
+    ship_classes = cursor.fetchall()
+    cursor.close()
+    return ship_classes

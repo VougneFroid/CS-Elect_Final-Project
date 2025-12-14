@@ -633,6 +633,30 @@ class TestShipClassCRUD:
         data = json.loads(response.data)
         assert data['status'] == 'error'
         assert 'not found' in data['message'].lower()
+    
+    def test_search_ship_classes_by_name(self, client):
+        # Test search ship classes by name (LIKE search)
+        response = client.get('/api/ship-classes?name=Test')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ship_classes' in data
+        assert isinstance(data['ship_classes'], list)
+    
+    def test_search_ship_classes_by_description(self, client):
+        # Test search ship classes by description (LIKE search)
+        response = client.get('/api/ship-classes?description=heavy')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ship_classes' in data
+        assert isinstance(data['ship_classes'], list)
+    
+    def test_search_ship_classes_combined(self, client):
+        # Test search ship classes with multiple criteria
+        response = client.get('/api/ship-classes?name=Class&description=test')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ship_classes' in data
+        assert isinstance(data['ship_classes'], list)
 
 
 class TestWeaponClassCRUD:

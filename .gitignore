@@ -1,0 +1,23 @@
+# Python specific files and directories
+__pycache__/
+*.py[cod]
+*.log
+venv/
+.venv/
+env/
+.env/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Development environment specific files
+# VS Code
+.vscode/
+# PyCharm/IntelliJ
+.idea/
+
+# OS generated files
+.DS_Store
+Thumbs.db

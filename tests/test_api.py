@@ -401,6 +401,68 @@ class TestShipCRUD:
         data = json.loads(response.data)
         assert data['status'] == 'error'
         assert 'not found' in data['message'].lower()
+    
+    def test_search_ships_by_name(self, client):
+        # Test search ships by name (LIKE search)
+        response = client.get('/api/ships?name=Test')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+    
+    def test_search_ships_by_ship_class_id(self, client):
+        # Test search ships by ship class ID
+        response = client.get('/api/ships?ship_class_id=1')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+    
+    def test_search_ships_by_pilot_id(self, client):
+        # Test search ships by pilot ID
+        response = client.get('/api/ships?pilot_id=1')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+    
+    def test_search_ships_by_capacity_range(self, client):
+        # Test search ships by capacity range
+        response = client.get('/api/ships?min_capacity=50&max_capacity=200')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+        for ship in data['ships']:
+            assert 50 <= ship['capacity'] <= 200
+    
+    def test_search_ships_by_speed_range(self, client):
+        # Test search ships by speed range
+        response = client.get('/api/ships?min_speed=300')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+        for ship in data['ships']:
+            assert ship['speed'] >= 300
+    
+    def test_search_ships_by_shield_range(self, client):
+        # Test search ships by shield range
+        response = client.get('/api/ships?max_shield=100')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+        for ship in data['ships']:
+            assert ship['shield'] <= 100
+    
+    def test_search_ships_invalid_parameter(self, client):
+        # Test search with invalid numeric parameter
+        response = client.get('/api/ships?min_capacity=invalid')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'integer' in data['message'].lower()
 
 
 class TestShipClassCRUD:

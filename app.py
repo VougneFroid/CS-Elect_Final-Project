@@ -1,7 +1,9 @@
 import json
 from flask import Flask, request, jsonify
 from flask_mysqldb import MySQL
-from utils.formatters import format_response
+from utils.formatters import format_response, row_to_dict, rows_to_dict_list
+from utils.validators import validate_pilot_data
+from models import pilot
 
 app = Flask(__name__)
 
@@ -11,6 +13,9 @@ app.config['MYSQL_PASSWORD'] = 'vondev'
 app.config['MYSQL_DB'] = 'shiperd'
 
 mysql = MySQL(app)
+
+# Column definitions
+PILOT_COLUMNS = ['id', 'name', 'flight_years', 'rank', 'mission_success']
 
 @app.route('/')
 def home():
@@ -41,6 +46,148 @@ def test_db():
             'status': 'error',
             'message': f'Database connection failed: {str(e)}'
         }), 500
+
+# Pilot Endpoints
+@app.route('/api/pilots', methods=['GET'])
+def get_pilots():
+    # Get all pilots
+    try:
+        pilots_data = pilot.get_all(mysql)
+        pilots_list = rows_to_dict_list(pilots_data, PILOT_COLUMNS)
+        return format_response({'pilots': pilots_list}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve pilots: {str(e)}'
+        }, 500)
+
+@app.route('/api/pilots/<int:pilot_id>', methods=['GET'])
+def get_pilot(pilot_id):
+    # Get a single pilot by ID
+    try:
+        pilot_data = pilot.get_by_id(mysql, pilot_id)
+        if pilot_data is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Pilot with ID {pilot_id} not found'
+            }, 404)
+        
+        pilot_dict = row_to_dict(pilot_data, PILOT_COLUMNS)
+        return format_response({'pilot': pilot_dict}, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to retrieve pilot: {str(e)}'
+        }, 500)
+
+@app.route('/api/pilots', methods=['POST'])
+def create_pilot():
+    # Create a new pilot
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_pilot_data(data, is_update=False)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Create pilot
+        pilot_id = pilot.create(mysql, data)
+        
+        # Retrieve and return the created pilot
+        created_pilot = pilot.get_by_id(mysql, pilot_id)
+        pilot_dict = row_to_dict(created_pilot, PILOT_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Pilot created successfully',
+            'pilot': pilot_dict
+        }, 201)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to create pilot: {str(e)}'
+        }, 500)
+
+@app.route('/api/pilots/<int:pilot_id>', methods=['PUT'])
+def update_pilot(pilot_id):
+    # Update an existing pilot
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return format_response({
+                'status': 'error',
+                'message': 'No data provided'
+            }, 400)
+        
+        # Validate input
+        is_valid, error_message = validate_pilot_data(data, is_update=True)
+        if not is_valid:
+            return format_response({
+                'status': 'error',
+                'message': error_message
+            }, 400)
+        
+        # Check if pilot exists
+        existing_pilot = pilot.get_by_id(mysql, pilot_id)
+        if existing_pilot is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Pilot with ID {pilot_id} not found'
+            }, 404)
+        
+        # Update pilot
+        pilot.update(mysql, pilot_id, data)
+        
+        # Retrieve and return updated pilot
+        updated_pilot = pilot.get_by_id(mysql, pilot_id)
+        pilot_dict = row_to_dict(updated_pilot, PILOT_COLUMNS)
+        
+        return format_response({
+            'status': 'success',
+            'message': 'Pilot updated successfully',
+            'pilot': pilot_dict
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to update pilot: {str(e)}'
+        }, 500)
+
+@app.route('/api/pilots/<int:pilot_id>', methods=['DELETE'])
+def delete_pilot(pilot_id):
+    # Delete a pilot
+    try:
+        # Check if pilot exists
+        existing_pilot = pilot.get_by_id(mysql, pilot_id)
+        if existing_pilot is None:
+            return format_response({
+                'status': 'error',
+                'message': f'Pilot with ID {pilot_id} not found'
+            }, 404)
+        
+        # Delete pilot
+        pilot.delete(mysql, pilot_id)
+        
+        return format_response({
+            'status': 'success',
+            'message': f'Pilot with ID {pilot_id} deleted successfully'
+        }, 200)
+    except Exception as e:
+        return format_response({
+            'status': 'error',
+            'message': f'Failed to delete pilot: {str(e)}'
+        }, 500)
 
 # Error Handlers
 @app.errorhandler(404)

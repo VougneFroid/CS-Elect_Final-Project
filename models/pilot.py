@@ -1,7 +1,5 @@
 def get_all(mysql):
-
-    # Get all pilots from the database.
-
+    # Get all pilots from the database
     cursor = mysql.connection.cursor()
     cursor.execute('''
         SELECT id, name, flight_years, rank, mission_success 
@@ -14,9 +12,7 @@ def get_all(mysql):
 
 
 def get_by_id(mysql, pilot_id):
-
-    # Get a specific pilot by ID.
-
+    # Get a specific pilot by ID
     cursor = mysql.connection.cursor()
     cursor.execute('''
         SELECT id, name, flight_years, rank, mission_success 
@@ -29,9 +25,7 @@ def get_by_id(mysql, pilot_id):
 
 
 def create(mysql, data):
-
-    # Create a new pilot.
-
+    # Create a new pilot
     cursor = mysql.connection.cursor()
     cursor.execute('''
         INSERT INTO pilot (name, flight_years, rank, mission_success)
@@ -44,8 +38,7 @@ def create(mysql, data):
 
 
 def update(mysql, pilot_id, data):
-
-    # Build dynamic UPDATE query based on provided fields
+    # Update an existing pilot
     update_fields = []
     values = []
     
@@ -65,10 +58,8 @@ def update(mysql, pilot_id, data):
         update_fields.append('mission_success = %s')
         values.append(data['mission_success'])
     
-    # Add pilot_id to values for WHERE clause
     values.append(pilot_id)
     
-    # Execute update query
     cursor = mysql.connection.cursor()
     query = f"UPDATE pilot SET {', '.join(update_fields)} WHERE id = %s"
     cursor.execute(query, values)
@@ -79,9 +70,7 @@ def update(mysql, pilot_id, data):
 
 
 def delete(mysql, pilot_id):
-
-    # Delete a pilot.
-    
+    # Delete a pilot
     cursor = mysql.connection.cursor()
     cursor.execute('DELETE FROM pilot WHERE id = %s', (pilot_id,))
     mysql.connection.commit()

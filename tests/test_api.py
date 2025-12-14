@@ -356,6 +356,176 @@ class TestShipCRUD:
         assert 'not found' in data['message'].lower()
 
 
+class TestShipClassCRUD:
+    # Test suite for ShipClass CRUD operations
+    
+    def test_get_all_ship_classes_json(self, client):
+        # Test GET all ship classes with JSON format
+        response = client.get('/api/ship-classes')
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        data = json.loads(response.data)
+        assert 'ship_classes' in data
+        assert isinstance(data['ship_classes'], list)
+    
+    def test_get_all_ship_classes_xml(self, client):
+        # Test GET all ship classes with XML format
+        response = client.get('/api/ship-classes?format=xml')
+        assert response.status_code == 200
+        assert response.content_type == 'application/xml'
+        assert b'<?xml' in response.data
+    
+    def test_get_ship_class_by_id_success(self, client):
+        # Test GET single ship class by ID (success)
+        response = client.get('/api/ship-classes/1')
+        assert response.status_code in [200, 404]  # 404 if ship class doesn't exist
+        if response.status_code == 200:
+            data = json.loads(response.data)
+            assert 'ship_class' in data
+            assert data['ship_class']['id'] == 1
+    
+    def test_get_ship_class_by_id_not_found(self, client):
+        # Test GET single ship class by ID (not found)
+        response = client.get('/api/ship-classes/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_create_ship_class_success(self, client):
+        # Test POST create new ship class (success with description)
+        new_ship_class = {
+            'name': 'Test Class',
+            'description': 'A test ship class'
+        }
+        response = client.post('/api/ship-classes',
+                              data=json.dumps(new_ship_class),
+                              content_type='application/json')
+        assert response.status_code == 201
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert 'ship_class' in data
+        assert data['ship_class']['name'] == 'Test Class'
+        
+        # Clean up - delete the created ship class
+        class_id = data['ship_class']['id']
+        client.delete(f'/api/ship-classes/{class_id}')
+    
+    def test_create_ship_class_without_description(self, client):
+        # Test POST create ship class without optional description
+        new_ship_class = {
+            'name': 'Test Class No Desc'
+        }
+        response = client.post('/api/ship-classes',
+                              data=json.dumps(new_ship_class),
+                              content_type='application/json')
+        assert response.status_code == 201
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert 'ship_class' in data
+        assert data['ship_class']['name'] == 'Test Class No Desc'
+        
+        # Clean up
+        class_id = data['ship_class']['id']
+        client.delete(f'/api/ship-classes/{class_id}')
+    
+    def test_create_ship_class_missing_field(self, client):
+        # Test POST create ship class with missing required field
+        incomplete_ship_class = {
+            'description': 'Missing name field'
+        }
+        response = client.post('/api/ship-classes',
+                              data=json.dumps(incomplete_ship_class),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'missing' in data['message'].lower() or 'required' in data['message'].lower()
+    
+    def test_create_ship_class_invalid_data_type(self, client):
+        # Test POST create ship class with invalid data type
+        invalid_ship_class = {
+            'name': 12345,  # Should be string
+            'description': 'Invalid name type'
+        }
+        response = client.post('/api/ship-classes',
+                              data=json.dumps(invalid_ship_class),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+    
+    def test_update_ship_class_success(self, client):
+        # Test PUT update ship class (success)
+        # First create a ship class to update
+        new_ship_class = {
+            'name': 'Class To Update',
+            'description': 'Original description'
+        }
+        create_response = client.post('/api/ship-classes',
+                                     data=json.dumps(new_ship_class),
+                                     content_type='application/json')
+        class_id = json.loads(create_response.data)['ship_class']['id']
+        
+        # Update the ship class
+        update_data = {
+            'description': 'Updated description'
+        }
+        response = client.put(f'/api/ship-classes/{class_id}',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert data['ship_class']['description'] == 'Updated description'
+        
+        # Clean up
+        client.delete(f'/api/ship-classes/{class_id}')
+    
+    def test_update_ship_class_not_found(self, client):
+        # Test PUT update ship class (not found)
+        update_data = {
+            'name': 'Updated Name'
+        }
+        response = client.put('/api/ship-classes/999999',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_delete_ship_class_success(self, client):
+        # Test DELETE ship class (success)
+        # First create a ship class to delete
+        new_ship_class = {
+            'name': 'Class To Delete',
+            'description': 'Will be deleted'
+        }
+        create_response = client.post('/api/ship-classes',
+                                     data=json.dumps(new_ship_class),
+                                     content_type='application/json')
+        class_id = json.loads(create_response.data)['ship_class']['id']
+        
+        # Delete the ship class
+        response = client.delete(f'/api/ship-classes/{class_id}')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        
+        # Verify it's deleted
+        get_response = client.get(f'/api/ship-classes/{class_id}')
+        assert get_response.status_code == 404
+    
+    def test_delete_ship_class_not_found(self, client):
+        # Test DELETE ship class (not found)
+        response = client.delete('/api/ship-classes/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+
+
 class TestErrorHandlers:
     # Test suite for error handlers
     

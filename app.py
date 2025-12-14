@@ -60,9 +60,45 @@ def test_db():
 # Pilot Endpoints
 @app.route('/api/pilots', methods=['GET'])
 def get_pilots():
-    # Get all pilots
+    # Get all pilots or search with criteria
     try:
-        pilots_data = pilot.get_all(mysql)
+        # Check for search parameters
+        criteria = {}
+        
+        # Name search (string)
+        if request.args.get('name'):
+            criteria['name'] = request.args.get('name')
+        
+        # Rank search (string)
+        if request.args.get('rank'):
+            criteria['rank'] = request.args.get('rank')
+        
+        # Minimum flight years (numeric)
+        if request.args.get('min_flight_years'):
+            try:
+                criteria['min_flight_years'] = int(request.args.get('min_flight_years'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_flight_years must be a valid integer'
+                }, 400)
+        
+        # Minimum mission success (numeric)
+        if request.args.get('min_mission_success'):
+            try:
+                criteria['min_mission_success'] = int(request.args.get('min_mission_success'))
+            except ValueError:
+                return format_response({
+                    'status': 'error',
+                    'message': 'min_mission_success must be a valid integer'
+                }, 400)
+        
+        # Use search if criteria provided, otherwise get all
+        if criteria:
+            pilots_data = pilot.search(mysql, criteria)
+        else:
+            pilots_data = pilot.get_all(mysql)
+        
         pilots_list = rows_to_dict_list(pilots_data, PILOT_COLUMNS)
         return format_response({'pilots': pilots_list}, 200)
     except Exception as e:

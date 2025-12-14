@@ -184,6 +184,178 @@ class TestPilotCRUD:
         assert 'not found' in data['message'].lower()
 
 
+class TestShipCRUD:
+    # Test suite for Ship CRUD operations
+    
+    def test_get_all_ships_json(self, client):
+        # Test GET all ships with JSON format
+        response = client.get('/api/ships')
+        assert response.status_code == 200
+        assert response.content_type == 'application/json'
+        data = json.loads(response.data)
+        assert 'ships' in data
+        assert isinstance(data['ships'], list)
+    
+    def test_get_all_ships_xml(self, client):
+        # Test GET all ships with XML format
+        response = client.get('/api/ships?format=xml')
+        assert response.status_code == 200
+        assert response.content_type == 'application/xml'
+        assert b'<?xml' in response.data
+    
+    def test_get_ship_by_id_success(self, client):
+        # Test GET single ship by ID (success)
+        response = client.get('/api/ships/1')
+        assert response.status_code in [200, 404]  # 404 if ship doesn't exist
+        if response.status_code == 200:
+            data = json.loads(response.data)
+            assert 'ship' in data
+            assert data['ship']['id'] == 1
+    
+    def test_get_ship_by_id_not_found(self, client):
+        # Test GET single ship by ID (not found)
+        response = client.get('/api/ships/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_create_ship_success(self, client):
+        # Test POST create new ship (success)
+        new_ship = {
+            'name': 'Test Ship',
+            'capacity': 100,
+            'speed': 500,
+            'shield': 80,
+            'ship_class_id': 1,
+            'pilot_id': 1
+        }
+        response = client.post('/api/ships',
+                              data=json.dumps(new_ship),
+                              content_type='application/json')
+        assert response.status_code == 201
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert 'ship' in data
+        assert data['ship']['name'] == 'Test Ship'
+        
+        # Clean up - delete the created ship
+        ship_id = data['ship']['id']
+        client.delete(f'/api/ships/{ship_id}')
+    
+    def test_create_ship_missing_field(self, client):
+        # Test POST create ship with missing required field
+        incomplete_ship = {
+            'name': 'Incomplete Ship',
+            'capacity': 50
+            # Missing speed, shield, ship_class_id, pilot_id
+        }
+        response = client.post('/api/ships',
+                              data=json.dumps(incomplete_ship),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'missing' in data['message'].lower() or 'required' in data['message'].lower()
+    
+    def test_create_ship_invalid_data_type(self, client):
+        # Test POST create ship with invalid data type
+        invalid_ship = {
+            'name': 'Invalid Ship',
+            'capacity': 'not_a_number',  # Should be int
+            'speed': 300,
+            'shield': 60,
+            'ship_class_id': 1,
+            'pilot_id': 1
+        }
+        response = client.post('/api/ships',
+                              data=json.dumps(invalid_ship),
+                              content_type='application/json')
+        assert response.status_code == 400
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+    
+    def test_update_ship_success(self, client):
+        # Test PUT update ship (success)
+        # First create a ship to update
+        new_ship = {
+            'name': 'Ship To Update',
+            'capacity': 75,
+            'speed': 400,
+            'shield': 70,
+            'ship_class_id': 1,
+            'pilot_id': 1
+        }
+        create_response = client.post('/api/ships',
+                                     data=json.dumps(new_ship),
+                                     content_type='application/json')
+        ship_id = json.loads(create_response.data)['ship']['id']
+        
+        # Update the ship
+        update_data = {
+            'speed': 600,
+            'shield': 90
+        }
+        response = client.put(f'/api/ships/{ship_id}',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        assert data['ship']['speed'] == 600
+        assert data['ship']['shield'] == 90
+        
+        # Clean up
+        client.delete(f'/api/ships/{ship_id}')
+    
+    def test_update_ship_not_found(self, client):
+        # Test PUT update ship (not found)
+        update_data = {
+            'speed': 800
+        }
+        response = client.put('/api/ships/999999',
+                             data=json.dumps(update_data),
+                             content_type='application/json')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+    
+    def test_delete_ship_success(self, client):
+        # Test DELETE ship (success)
+        # First create a ship to delete
+        new_ship = {
+            'name': 'Ship To Delete',
+            'capacity': 30,
+            'speed': 200,
+            'shield': 40,
+            'ship_class_id': 1,
+            'pilot_id': 1
+        }
+        create_response = client.post('/api/ships',
+                                     data=json.dumps(new_ship),
+                                     content_type='application/json')
+        ship_id = json.loads(create_response.data)['ship']['id']
+        
+        # Delete the ship
+        response = client.delete(f'/api/ships/{ship_id}')
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data['status'] == 'success'
+        
+        # Verify it's deleted
+        get_response = client.get(f'/api/ships/{ship_id}')
+        assert get_response.status_code == 404
+    
+    def test_delete_ship_not_found(self, client):
+        # Test DELETE ship (not found)
+        response = client.delete('/api/ships/999999')
+        assert response.status_code == 404
+        data = json.loads(response.data)
+        assert data['status'] == 'error'
+        assert 'not found' in data['message'].lower()
+
+
 class TestErrorHandlers:
     # Test suite for error handlers
     
